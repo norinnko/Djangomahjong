@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Haku (White Dragon) tile -->
+<svg
+   width="300"
+   height="400"
+   viewBox="0 0 300 400"
+   xmlns="http://www.w3.org/2000/svg">
+  <!-- Tile Background (cream/ivory color) - full opacity -->
+  <rect
+     x="0"
+     y="0"
+     width="300"
+     height="400"
+     rx="15"
+     ry="15"
+     fill="#f5f5dc"
+     stroke="#cccccc"
+     stroke-width="3" />
+  
+  <!-- Outer decorative border (blue/teal traditional Haku frame) -->
+  <rect
+     x="35"
+     y="55"
+     width="230"
+     height="290"
+     rx="10"
+     ry="10"
+     fill="none"
+     stroke="#1a75bb"
+     stroke-width="10" />
+  
+  <!-- Inner decorative frame -->
+  <rect
+     x="55"
+     y="75"
+     width="190"
+     height="250"
+     rx="8"
+     ry="8"
+     fill="none"
+     stroke="#1a75bb"
+     stroke-width="5" />
+</svg>

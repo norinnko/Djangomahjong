@@ -1,0 +1,584 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Calculator Form -->
+    <div class="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-bold mb-4 text-slate-800">点数計算</h2>
+
+        <form method="post" id="calcForm" class="space-y-6">
+            {% csrf_token %}
+
+            <!-- Hand Tiles Display -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">手牌 (13枚 - 副露を除く)</label>
+                <div id="hand-display"
+                    class="bg-green-800 p-4 rounded-lg min-h-[60px] flex gap-1 overflow-x-auto items-center">
+                    <!-- Tiles will be added here via JS -->
+                    <span class="text-white/50 text-sm" id="hand-placeholder">牌を選択してください...</span>
+                </div>
+                <input type="hidden" name="hand_str" id="hand_str">
+            </div>
+
+            <!-- Melds (副露) Section -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">副露 (ポン・チー・カン)</label>
+                <div id="melds-display"
+                    class="bg-green-700 p-4 rounded-lg min-h-[60px] flex gap-3 flex-wrap items-center">
+                    <span class="text-white/50 text-sm" id="meld-placeholder">副露がある場合は下で追加...</span>
+                </div>
+                <input type="hidden" name="melds_str" id="melds_str">
+
+                <!-- Meld Builder -->
+                <div class="mt-3 p-3 bg-slate-100 rounded-lg">
+                    <div class="flex flex-wrap gap-3 items-center">
+                        <select id="meld-type"
+                            class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                            <option value="pon">ポン (3枚)</option>
+                            <option value="chi">チー (順子3枚)</option>
+                            <option value="minkan">明槓 (4枚)</option>
+                            <option value="ankan">暗槓 (4枚)</option>
+                        </select>
+                        <div id="meld-tiles-picker" class="flex gap-1 items-center">
+                            <span class="text-slate-500 text-sm">牌を選択中: </span>
+                            <div id="meld-tiles-staging"
+                                class="flex gap-1 bg-white p-2 rounded min-w-[80px] min-h-[40px]"></div>
+                        </div>
+                        <button type="button" id="addMeldBtn"
+                            class="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded transition">
+                            副露を追加
+                        </button>
+                        <button type="button" id="clearMeldStagingBtn"
+                            class="bg-slate-400 hover:bg-slate-500 text-white text-sm py-2 px-3 rounded transition">
+                            クリア
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Winning Tile -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">和了牌 (1枚)</label>
+                <div id="win-tile-display"
+                    class="bg-green-800 p-4 rounded-lg min-h-[60px] flex gap-1 items-center w-max">
+                    <span class="text-white/50 text-sm" id="win-placeholder">未選択</span>
+                </div>
+                <input type="hidden" name="win_tile" id="win_tile">
+            </div>
+
+            <!-- Options -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">自風 (Player Wind)</label>
+                    <select name="player_wind"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="east">東 (East)</option>
+                        <option value="south">南 (South)</option>
+                        <option value="west">西 (West)</option>
+                        <option value="north">北 (North)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">場風 (Round Wind)</label>
+                    <select name="round_wind"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="east">東 (East)</option>
+                        <option value="south">南 (South)</option>
+                        <option value="west">西 (West)</option>
+                        <option value="north">北 (North)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex gap-6">
+                <label class="inline-flex items-center">
+                    <input type="checkbox" name="is_tsumo"
+                        class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                    <span class="ml-2 text-slate-700">ツモ (Tsumo)</span>
+                </label>
+                <label class="inline-flex items-center">
+                    <input type="checkbox" name="is_riichi"
+                        class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                    <span class="ml-2 text-slate-700">リーチ (Riichi)</span>
+                </label>
+            </div>
+
+            <!-- Error Message -->
+            {% if result.error %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                <strong class="font-bold">エラー:</strong>
+                <span class="block sm:inline">{{ result.error }}</span>
+            </div>
+            {% endif %}
+
+            <div class="flex gap-4">
+                <button type="submit"
+                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded transition">
+                    計算する
+                </button>
+                <button type="button" id="resetBtn"
+                    class="bg-slate-500 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded transition">
+                    クリア
+                </button>
+            </div>
+        </form>
+
+        <!-- Tile Picker -->
+        <div class="mt-8 border-t pt-6">
+            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">牌選択パネル</h3>
+            <div class="space-y-4">
+                <!-- Manzu -->
+                <div class="flex flex-wrap gap-1">
+                    {% for i in "123456789" %}
+                    <img src="{% static 'images/tiles/Man'|add:i|add:'.svg' %}" class="mahjong-tile" data-val="{{ i }}m"
+                        onclick="onTileClick('{{ i }}m', this.src)">
+                    {% endfor %}
+                </div>
+                <!-- Pinzu -->
+                <div class="flex flex-wrap gap-1">
+                    {% for i in "123456789" %}
+                    <img src="{% static 'images/tiles/Pin'|add:i|add:'.svg' %}" class="mahjong-tile" data-val="{{ i }}p"
+                        onclick="onTileClick('{{ i }}p', this.src)">
+                    {% endfor %}
+                </div>
+                <!-- Souzu -->
+                <div class="flex flex-wrap gap-1">
+                    {% for i in "123456789" %}
+                    <img src="{% static 'images/tiles/Sou'|add:i|add:'.svg' %}" class="mahjong-tile" data-val="{{ i }}s"
+                        onclick="onTileClick('{{ i }}s', this.src)">
+                    {% endfor %}
+                </div>
+                <!-- Honors -->
+                <div class="flex flex-wrap gap-1">
+                    <img src="{% static 'images/tiles/Ton.svg' %}" class="mahjong-tile" data-val="1z"
+                        onclick="onTileClick('1z', this.src)">
+                    <img src="{% static 'images/tiles/Nan.svg' %}" class="mahjong-tile" data-val="2z"
+                        onclick="onTileClick('2z', this.src)">
+                    <img src="{% static 'images/tiles/Shaa.svg' %}" class="mahjong-tile" data-val="3z"
+                        onclick="onTileClick('3z', this.src)">
+                    <img src="{% static 'images/tiles/Pei.svg' %}" class="mahjong-tile" data-val="4z"
+                        onclick="onTileClick('4z', this.src)">
+                    <img src="{% static 'images/tiles/Haku.svg' %}" class="mahjong-tile" data-val="5z"
+                        onclick="onTileClick('5z', this.src)">
+                    <img src="{% static 'images/tiles/Hatsu.svg' %}" class="mahjong-tile" data-val="6z"
+                        onclick="onTileClick('6z', this.src)">
+                    <img src="{% static 'images/tiles/Chun.svg' %}" class="mahjong-tile" data-val="7z"
+                        onclick="onTileClick('7z', this.src)">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Panel -->
+    <div class="lg:col-span-1">
+        {% if result and not result.error %}
+        <div class="bg-white rounded-lg shadow-md p-6 sticky top-6">
+            <h3 class="text-xl font-bold mb-4 text-green-700">計算結果</h3>
+
+            <div class="text-center mb-6">
+                <div class="text-5xl font-bold text-slate-800">
+                    {% if result.cost.main %}
+                    {{ result.cost.main }} <span class="text-lg text-slate-500 font-normal">点</span>
+                    {% if result.cost.additional %}
+                    <div class="text-lg text-slate-500 mt-1">
+                        ({{ result.cost.main }} / {{ result.cost.additional }})
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    {{ result.cost.total }} <span class="text-lg text-slate-500 font-normal">点</span>
+                    {% endif %}
+                </div>
+                <div class="mt-2 text-xl font-semibold text-slate-600">
+                    {{ result.han }}翻 {{ result.fu }}符
+                </div>
+            </div>
+
+            <div class="border-t pt-4">
+                <h4 class="font-bold text-slate-600 mb-2">成立役</h4>
+                <ul class="list-disc pl-5 space-y-1">
+                    {% for yaku in result.yaku %}
+                    <li class="text-slate-800">{{ yaku }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div class="mt-6 pt-4 border-t text-sm text-slate-400">
+                計算ID: {{ timestamp }}
+            </div>
+        </div>
+        {% else %}
+        <div class="bg-white rounded-lg shadow-md p-6 text-slate-400 text-center">
+            計算結果はここに表示されます
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .hand-tile {
+        transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .hand-tile.dragging {
+        opacity: 0.5;
+        transform: scale(1.1);
+    }
+
+    .hand-tile.drag-over {
+        transform: translateX(10px);
+    }
+
+    .meld-group {
+        display: flex;
+        gap: 2px;
+        padding: 4px 8px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        position: relative;
+    }
+
+    .meld-group .meld-label {
+        position: absolute;
+        top: -12px;
+        left: 0;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .meld-group .remove-meld {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 18px;
+        height: 18px;
+        background: #ef4444;
+        color: white;
+        border-radius: 50%;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+</style>
+
+<script>
+    let handTiles = [];
+    let winTile = null;
+    let melds = []; // Array of {type: 'pon'|'chi'|'minkan'|'ankan', tiles: [{val, src}...]}
+    let meldStagingTiles = [];
+    let draggedIndex = null;
+
+    // Count how many of a specific tile are used (hand + winTile + melds)
+    function countTileUsage(val) {
+        let count = 0;
+        // Count in hand
+        handTiles.forEach(t => { if (t.val === val) count++; });
+        // Count in winTile
+        if (winTile && winTile.val === val) count++;
+        // Count in melds
+        melds.forEach(m => {
+            m.tiles.forEach(t => { if (t.val === val) count++; });
+        });
+        // Count in staging
+        meldStagingTiles.forEach(t => { if (t.val === val) count++; });
+        return count;
+    }
+
+    // Unified tile click handler
+    function onTileClick(val, src) {
+        // Check 4-tile limit
+        if (countTileUsage(val) >= 4) {
+            alert(`同じ牌は4枚までしか使用できません。(${val})`);
+            return;
+        }
+
+        // If we're building a meld, add to staging
+        if (document.activeElement && document.activeElement.id === 'meld-type') {
+            addToMeldStaging(val, src);
+            return;
+        }
+
+        // Otherwise add to hand or winTile
+        addTile(val, src);
+    }
+
+    function addTile(val, src) {
+        // Check 4-tile limit again
+        if (countTileUsage(val) >= 4) {
+            alert(`同じ牌は4枚までしか使用できません。(${val})`);
+            return;
+        }
+
+        // Calculate expected hand size (13 - tiles used in melds)
+        const meldTilesCount = melds.reduce((sum, m) => sum + (m.type === 'ankan' ? 0 : m.tiles.length), 0);
+        const expectedHandSize = 13 - meldTilesCount;
+
+        if (handTiles.length < expectedHandSize) {
+            handTiles.push({ val, src });
+            updateHandInfo();
+        } else if (!winTile) {
+            winTile = { val, src };
+            updateHandInfo();
+        } else {
+            alert('これ以上牌を選択できません。');
+        }
+    }
+
+    function addToMeldStaging(val, src) {
+        const meldType = document.getElementById('meld-type').value;
+        const maxTiles = (meldType === 'minkan' || meldType === 'ankan') ? 4 : 3;
+
+        if (meldStagingTiles.length >= maxTiles) {
+            alert(`この副露タイプには${maxTiles}枚必要です。`);
+            return;
+        }
+
+        meldStagingTiles.push({ val, src });
+        updateMeldStaging();
+    }
+
+    function updateMeldStaging() {
+        const stagingDiv = document.getElementById('meld-tiles-staging');
+        stagingDiv.innerHTML = '';
+        meldStagingTiles.forEach((tile, idx) => {
+            const img = document.createElement('img');
+            img.src = tile.src;
+            img.className = 'w-7 h-auto cursor-pointer hover:opacity-80';
+            img.onclick = () => {
+                meldStagingTiles.splice(idx, 1);
+                updateMeldStaging();
+            };
+            stagingDiv.appendChild(img);
+        });
+    }
+
+    function removeHandTile(index) {
+        handTiles.splice(index, 1);
+        updateHandInfo();
+    }
+
+    function removeWinTile() {
+        winTile = null;
+        updateHandInfo();
+    }
+
+    function removeMeld(index) {
+        melds.splice(index, 1);
+        updateMeldsDisplay();
+        updateFormInputs();
+    }
+
+    function updateHandInfo() {
+        const handDiv = document.getElementById('hand-display');
+        const winDiv = document.getElementById('win-tile-display');
+
+        // Render Hand with drag support
+        if (handTiles.length === 0) {
+            handDiv.innerHTML = '<span class="text-white/50 text-sm" id="hand-placeholder">牌を選択してください...</span>';
+        } else {
+            handDiv.innerHTML = '';
+            handTiles.forEach((tile, idx) => {
+                const img = document.createElement('img');
+                img.src = tile.src;
+                img.className = 'w-9 h-auto cursor-pointer hover:opacity-80 hand-tile';
+                img.draggable = true;
+                img.dataset.index = idx;
+
+                // Drag events
+                img.ondragstart = (e) => {
+                    draggedIndex = idx;
+                    img.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                };
+                img.ondragend = () => {
+                    img.classList.remove('dragging');
+                    draggedIndex = null;
+                    document.querySelectorAll('.hand-tile').forEach(el => el.classList.remove('drag-over'));
+                };
+                img.ondragover = (e) => {
+                    e.preventDefault();
+                    if (draggedIndex !== null && draggedIndex !== idx) {
+                        img.classList.add('drag-over');
+                    }
+                };
+                img.ondragleave = () => {
+                    img.classList.remove('drag-over');
+                };
+                img.ondrop = (e) => {
+                    e.preventDefault();
+                    img.classList.remove('drag-over');
+                    if (draggedIndex !== null && draggedIndex !== idx) {
+                        // Reorder
+                        const draggedTile = handTiles[draggedIndex];
+                        handTiles.splice(draggedIndex, 1);
+                        handTiles.splice(idx, 0, draggedTile);
+                        updateHandInfo();
+                    }
+                };
+
+                img.onclick = () => removeHandTile(idx);
+                handDiv.appendChild(img);
+            });
+        }
+
+        // Render Win Tile
+        if (!winTile) {
+            winDiv.innerHTML = '<span class="text-white/50 text-sm" id="win-placeholder">未選択</span>';
+        } else {
+            winDiv.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = winTile.src;
+            img.className = 'w-9 h-auto cursor-pointer hover:opacity-80';
+            img.onclick = () => removeWinTile();
+            winDiv.appendChild(img);
+        }
+
+        updateFormInputs();
+    }
+
+    function updateMeldsDisplay() {
+        const meldsDiv = document.getElementById('melds-display');
+
+        if (melds.length === 0) {
+            meldsDiv.innerHTML = '<span class="text-white/50 text-sm" id="meld-placeholder">副露がある場合は下で追加...</span>';
+        } else {
+            meldsDiv.innerHTML = '';
+            melds.forEach((meld, meldIdx) => {
+                const group = document.createElement('div');
+                group.className = 'meld-group';
+
+                const label = document.createElement('span');
+                label.className = 'meld-label';
+                label.textContent = { 'pon': 'ポン', 'chi': 'チー', 'minkan': '明槓', 'ankan': '暗槓' }[meld.type];
+                group.appendChild(label);
+
+                meld.tiles.forEach(tile => {
+                    const img = document.createElement('img');
+                    img.src = tile.src;
+                    img.className = 'w-7 h-auto';
+                    group.appendChild(img);
+                });
+
+                const removeBtn = document.createElement('span');
+                removeBtn.className = 'remove-meld';
+                removeBtn.textContent = '×';
+                removeBtn.onclick = () => removeMeld(meldIdx);
+                group.appendChild(removeBtn);
+
+                meldsDiv.appendChild(group);
+            });
+        }
+    }
+
+    function updateFormInputs() {
+        const handInput = document.getElementById('hand_str');
+        const winInput = document.getElementById('win_tile');
+        const meldsInput = document.getElementById('melds_str');
+
+        // Hand string
+        handInput.value = constructTileString(handTiles);
+        winInput.value = winTile ? constructTileString([winTile]) : '';
+
+        // Melds string: format is "type:tiles;type:tiles;..."
+        // e.g., "pon:5z5z5z;chi:1m2m3m"
+        const meldStrings = melds.map(m => {
+            const tilesStr = constructTileString(m.tiles);
+            return `${m.type}:${tilesStr}`;
+        });
+        meldsInput.value = meldStrings.join(';');
+    }
+
+    function constructTileString(tilesArray) {
+        // Group by type (m, p, s, z)
+        let m = [], p = [], s = [], z = [];
+        tilesArray.forEach(t => {
+            const val = t.val; // '1m', '2z' etc
+            const num = val.slice(0, -1);
+            const suit = val.slice(-1);
+            if (suit === 'm') m.push(num);
+            if (suit === 'p') p.push(num);
+            if (suit === 's') s.push(num);
+            if (suit === 'z') z.push(num);
+        });
+
+        let res = '';
+        if (m.length) res += m.join('') + 'm';
+        if (p.length) res += p.join('') + 'p';
+        if (s.length) res += s.join('') + 's';
+        if (z.length) res += z.join('') + 'z';
+        return res;
+    }
+
+    // Event Listeners
+    document.getElementById('resetBtn').addEventListener('click', () => {
+        handTiles = [];
+        winTile = null;
+        melds = [];
+        meldStagingTiles = [];
+        updateHandInfo();
+        updateMeldsDisplay();
+        updateMeldStaging();
+    });
+
+    document.getElementById('addMeldBtn').addEventListener('click', () => {
+        const meldType = document.getElementById('meld-type').value;
+        const expectedTiles = (meldType === 'minkan' || meldType === 'ankan') ? 4 : 3;
+
+        if (meldStagingTiles.length !== expectedTiles) {
+            alert(`${expectedTiles}枚の牌を選択してください。`);
+            return;
+        }
+
+        // Validate meld
+        if (meldType === 'pon') {
+            // All 3 tiles must be the same
+            const firstVal = meldStagingTiles[0].val;
+            if (!meldStagingTiles.every(t => t.val === firstVal)) {
+                alert('ポンは同じ牌3枚が必要です。');
+                return;
+            }
+        } else if (meldType === 'chi') {
+            // Must be sequential same-suit number tiles
+            const suits = meldStagingTiles.map(t => t.val.slice(-1));
+            if (!suits.every(s => s === suits[0]) || suits[0] === 'z') {
+                alert('チーは同じ色の数牌で順子を作る必要があります。');
+                return;
+            }
+            const nums = meldStagingTiles.map(t => parseInt(t.val.slice(0, -1))).sort((a, b) => a - b);
+            if (nums[1] !== nums[0] + 1 || nums[2] !== nums[1] + 1) {
+                alert('チーは連続する3枚の牌が必要です。');
+                return;
+            }
+        } else if (meldType === 'minkan' || meldType === 'ankan') {
+            // All 4 tiles must be the same
+            const firstVal = meldStagingTiles[0].val;
+            if (!meldStagingTiles.every(t => t.val === firstVal)) {
+                alert('カンは同じ牌4枚が必要です。');
+                return;
+            }
+        }
+
+        melds.push({ type: meldType, tiles: [...meldStagingTiles] });
+        meldStagingTiles = [];
+        updateMeldsDisplay();
+        updateMeldStaging();
+        updateFormInputs();
+    });
+
+    document.getElementById('clearMeldStagingBtn').addEventListener('click', () => {
+        meldStagingTiles = [];
+        updateMeldStaging();
+    });
+
+    // Focus meld-type dropdown when clicking on staging area to enable meld mode
+    document.getElementById('meld-tiles-staging').addEventListener('click', () => {
+        document.getElementById('meld-type').focus();
+    });
+
+    // Initialize
+    updateHandInfo();
+    updateMeldsDisplay();
+</script>
+{% endblock %}
