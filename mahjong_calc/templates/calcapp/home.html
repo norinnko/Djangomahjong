@@ -1,0 +1,136 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI麻雀点数計算</title>
+  <link rel="stylesheet" href="{% static 'nori.css' %}">
+</head>
+<body>
+<div class="container" data-tile-base="{% static 'Regular/' %}">
+  <h1>🀄 AI麻雀点数計算</h1>
+
+  {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+        <div class="msg {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+  {% if form.errors %}
+    <div class="error-banner">
+      {% for errs in form.errors.values %}
+        {% for err in errs %}
+          {{ err }}<br>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  {% endif %}
+  <div id="js-error" class="error-banner" hidden></div>
+
+  <form method="post" id="calc-form">
+    {% csrf_token %}
+    <input type="hidden" id="hand-text" name="hand_text" value="{{ form.hand_text.value|default:'' }}">
+    <input type="hidden" id="win-tile-text" name="win_tile_text" value="{{ form.win_tile_text.value|default:'' }}">
+    <input type="hidden" id="dora-text" name="dora_text" value="{{ form.dora_text.value|default:'' }}">
+    <input type="hidden" id="ura-dora-text" name="ura_dora_text" value="{{ form.ura_dora_text.value|default:'' }}">
+    <input type="hidden" id="melds-text" name="melds_text" value="{{ form.melds_text.value|default:'' }}">
+    <input type="hidden" id="aka-dora-count" name="aka_dora_count" value="{{ form.aka_dora_count.value|default:'0' }}">
+    <input type="hidden" id="honba" name="honba" value="{{ form.honba.value|default:'0' }}">
+    <input type="hidden" id="riichi-sticks" name="riichi_sticks" value="{{ form.riichi_sticks.value|default:'0' }}">
+    <input type="hidden" id="open-tanyao-rule" name="open_tanyao_rule" value="{{ form.open_tanyao_rule.value|default:'on' }}">
+    <input type="hidden" id="is-riichi" name="is_riichi" value="{{ form.is_riichi.value|default:'' }}">
+    <input type="checkbox" id="is-dealer" name="is_dealer" hidden {% if form.is_dealer.value %}checked{% endif %}>
+
+    <div class="card">
+      <div class="section-title">条件設定</div>
+      {% with round_val=form.round_wind.value|default:'E' %}
+      {% with seat_val=form.self_wind.value|default:'S' %}
+      {% with win_val=form.win_type.value|default:'ron' %}
+      <div class="settings-grid">
+        <div class="select-group">
+          <label for="round-wind">場風</label>
+          <select id="round-wind" name="round_wind">
+            <option value="E" {% if round_val == 'E' %}selected{% endif %}>東</option>
+            <option value="S" {% if round_val == 'S' %}selected{% endif %}>南</option>
+            <option value="W" {% if round_val == 'W' %}selected{% endif %}>西</option>
+            <option value="N" {% if round_val == 'N' %}selected{% endif %}>北</option>
+          </select>
+        </div>
+        <div class="select-group">
+          <label for="seat-wind">自風</label>
+          <select id="seat-wind" name="self_wind">
+            <option value="E" {% if seat_val == 'E' %}selected{% endif %}>東</option>
+            <option value="S" {% if seat_val == 'S' %}selected{% endif %}>南</option>
+            <option value="W" {% if seat_val == 'W' %}selected{% endif %}>西</option>
+            <option value="N" {% if seat_val == 'N' %}selected{% endif %}>北</option>
+          </select>
+        </div>
+        <div class="select-group">
+          <label for="win-type">アガリ方</label>
+          <select id="win-type" name="win_type">
+            <option value="ron" {% if win_val == 'ron' %}selected{% endif %}>ロン</option>
+            <option value="tsumo" {% if win_val == 'tsumo' %}selected{% endif %}>ツモ</option>
+          </select>
+        </div>
+      </div>
+      {% endwith %}
+      {% endwith %}
+      {% endwith %}
+    </div>
+
+    <div class="card">
+      <div class="hand-header">
+        <div class="section-title">手牌 (クリックで削除)</div>
+        <button type="button" class="btn-clear" data-action="clear">クリア</button>
+      </div>
+
+      <div class="hand-area" id="hand-display">
+        <span class="hand-hint">下のリストから牌を選んでください</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="palette-tabs">
+        <button type="button" class="tab-btn active" data-suit="man">萬子</button>
+        <button type="button" class="tab-btn" data-suit="pin">筒子</button>
+        <button type="button" class="tab-btn" data-suit="sou">索子</button>
+        <button type="button" class="tab-btn" data-suit="ji">字牌</button>
+      </div>
+      <div class="palette-grid" id="palette-display"></div>
+    </div>
+
+    <button class="btn-calc" type="submit">計算してAI解説を聞く</button>
+  </form>
+</div>
+
+<div id="result-modal">
+  <div class="modal-content">
+    <h2 style="margin-top:0;">計算結果</h2>
+
+    <div class="score-display">
+      <div id="score-label" class="score-label">結果</div>
+      <div id="score-main" class="score-main">0 点</div>
+      <div id="score-sub" class="score-sub">(0符 0翻)</div>
+    </div>
+
+    <div id="payment-breakdown" class="payment-breakdown"></div>
+
+    <div>
+      <strong>成立役:</strong>
+      <ul id="yaku-list" class="yaku-list"></ul>
+    </div>
+
+    <div class="ai-comment-box">
+      <div class="ai-label">🤖 AIプロ講師の解説</div>
+      <p id="ai-text" class="ai-text"></p>
+    </div>
+
+    <button type="button" class="btn-calc btn-close" id="modal-close">閉じる</button>
+  </div>
+</div>
+
+<script src="{% static 'mahjong-ui.js' %}" defer></script>
+</body>
+</html>

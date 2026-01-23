@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}結果 #{{ obj.id }} | 麻雀 点数計算{% endblock %}
+{% block content %}
+<h1>結果 #{{ obj.id }}</h1>
+
+<div class="card">
+  <h2>入力</h2>
+  <div class="kv">
+    <div><span class="k">手牌</span><span class="v">{{ obj.hand_text }}</span></div>
+    <div><span class="k">和了牌</span><span class="v">{{ obj.win_tile_text }}</span></div>
+  </div>
+</div>
+
+<div class="grid">
+  <section class="card">
+    <h2>翻・符・役</h2>
+    <p><b>{{ obj.result_json.han }}</b> 翻 / <b>{{ obj.result_json.fu }}</b> 符</p>
+    <h3>役一覧</h3>
+    {% if obj.result_json.yaku_names %}
+      <ul class="list tight">
+        {% for y in obj.result_json.yaku_names %}<li>{{ y }}</li>{% endfor %}
+      </ul>
+    {% else %}<p class="muted">役なし（または入力不正）</p>{% endif %}
+  </section>
+
+  <section class="card">
+    <h2>点数</h2>
+    {% with p=obj.result_json.payout %}
+      {% if p.type == "ron" %}
+        <p>放銃者の支払: <b>{{ p.pay_from_loser }}</b> 点（本場込み）</p>
+        <p>供託: <b>+{{ p.riichi_sticks_bonus }}</b> 点</p>
+        <p>合計（獲得）: <b>{{ p.total_gain }}</b> 点</p>
+      {% else %}
+        {% if obj.config_json.is_dealer %}
+          <p>ツモ（親）: 各自 <b>{{ p.each_pay }}</b> 点（本場込み）</p>
+          <p>供託: <b>+{{ p.riichi_sticks_bonus }}</b> 点</p>
+          <p>合計（獲得）: <b>{{ p.total_gain }}</b> 点</p>
+        {% else %}
+          <p>ツモ（子）: 親 <b>{{ p.dealer_pay }}</b> 点 / 子 <b>{{ p.non_dealer_pay }}</b> 点（本場込み）</p>
+          <p>供託: <b>+{{ p.riichi_sticks_bonus }}</b> 点</p>
+          <p>合計（獲得）: <b>{{ p.total_gain }}</b> 点</p>
+        {% endif %}
+      {% endif %}
+    {% endwith %}
+  </section>
+</div>
+
+<div class="card">
+  <h2>かんたん解説（AI風）</h2>
+  <pre class="explain">{{ obj.result_json.explain_text }}</pre>
+</div>
+
+<div class="row-actions">
+  <a class="btn-secondary" href="{% url 'calcapp:history_list' %}">履歴に戻る</a>
+  <a class="btn-danger" href="{% url 'calcapp:history_delete' obj.id %}">削除</a>
+</div>
+{% endblock %}

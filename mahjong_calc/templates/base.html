@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}麻雀 点数計算{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="container">
+    <div class="brand"><a href="/">麻雀 点数計算</a></div>
+    <nav class="nav">
+      <a href="/">計算</a>
+      <a href="/history/">履歴</a>
+      {% if user.is_authenticated %}
+        <span class="muted">|</span>
+        <span class="muted">{{ user.username }}</span>
+        <form action="{% url 'logout' %}" method="post" class="inline">
+          {% csrf_token %}
+          <button class="linklike" type="submit">ログアウト</button>
+        </form>
+      {% endif %}
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+  {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+        <div class="msg {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+  <div class="container muted">MVP: Django + mahjong</div>
+</footer>
+</body>
+</html>

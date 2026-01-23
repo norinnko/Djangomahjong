@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}履歴 | 麻雀 点数計算{% endblock %}
+{% block content %}
+<h1>履歴</h1>
+{% if items %}
+  <ul class="list">
+    {% for it in items %}
+      <li class="row">
+        <div>
+          <a href="{% url 'calcapp:history_detail' it.id %}">#{{ it.id }}</a>
+          <span class="muted">{{ it.created_at|date:"Y-m-d H:i" }}</span><br>
+          <span>手牌: {{ it.hand_text }}</span> / <span>和了: {{ it.win_tile_text }}</span>
+        </div>
+        <div>
+          <a class="btn-danger" href="{% url 'calcapp:history_delete' it.id %}">削除</a>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="muted">まだ履歴はありません。</p>
+{% endif %}
+{% endblock %}
